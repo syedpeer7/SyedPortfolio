@@ -1,0 +1,178 @@
+import time
+import json
+import http.client
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from mailersend import emails  # Ensure you have mailersend installed: pip install mailersend
+
+# Connection details for RapidAPI's Instagram Scraper API
+API_HOST = "instagram-scraper-api2.p.rapidapi.com"
+API_KEY = '77c3fc0858msheb391c7d2421e57p1dc3e1jsn49c69c412cd2'  # Replace with your valid API key
+
+headers = {
+    'x-rapidapi-key': API_KEY,
+    'x-rapidapi-host': API_HOST
+}
+
+# Email details
+MAILERSEND_API_KEY = "your_mailersend_api_key"  # Replace with your Mailersend API key
+RECIPIENT_EMAIL = "user_email@example.com"  # Replace with the user's email address
+SENDER_EMAIL = "your_email@example.com"  # Replace with your email address
+
+def send_email_notification(spam_comments):
+    """
+    Send an email notification about detected spam comments.
+    """
+    subject = "Spam Detected in Your Instagram Post"
+    body = f"The following spam comments were detected:\n\n" + "\n".join(spam_comments)
+
+    try:
+        mail = emails.NewEmail(MAILERSEND_API_KEY)
+        mail.set_mail_from(SENDER_EMAIL)
+        mail.set_subject(subject)
+        mail.set_text(body)
+        mail.add_recipient(RECIPIENT_EMAIL)
+        response = mail.send()
+        print("Email sent successfully:", response)
+    except Exception as e:
+        print(f"Error sending email: {e}")
+
+def detect_spam(comment_text):
+    spam_keywords = []
+    with open("output_list.txt", "r", encoding="utf-8") as file:
+        spam_keywords = [line.strip() for line in file.readlines()]
+    comment_lower = comment_text.lower()
+    return any(keyword in comment_lower for keyword in spam_keywords)
+
+def inject_spam_comments(driver, spam_comments):
+    if not spam_comments:
+        return
+
+    spam_html = "".join(
+        f"<div style='margin-bottom:10px; padding:5px; border:1px solid red; background-color:#ffe6e6;'>{comment}</div>"
+        for comment in spam_comments
+    )
+
+    script = f"""
+        var popup = document.createElement('div');
+        popup.id = 'spam-popup';
+        popup.style.position = 'fixed';
+        popup.style.bottom = '20px';
+        popup.style.right = '20px';
+        popup.style.width = '300px';
+        popup.style.maxHeight = '400px';
+        popup.style.overflowY = 'auto';
+        popup.style.padding = '10px';
+        popup.style.border = '1px solid #ccc';
+        popup.style.borderRadius = '8px';
+        popup.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+        popup.style.backgroundColor = 'white';
+        popup.style.color = 'black';
+        popup.style.zIndex = '1000';
+
+        var closeButton = document.createElement('button');
+        closeButton.innerText = 'Close';
+        closeButton.style.position = 'absolute';
+        closeButton.style.top = '5px';
+        closeButton.style.right = '10px';
+        closeButton.style.cursor = 'pointer';
+        closeButton.onclick = function() {
+            popup.remove();
+        };
+        popup.appendChild(closeButton);
+
+        var spamContent = document.createElement('div');
+        spamContent.innerHTML = `{spam_html}`;
+        popup.appendChild(spamContent);
+
+        document.body.appendChild(popup);
+    """
+    driver.execute_script(script)
+
+def fetch_instagram_comments(post_url):
+    """
+    Fetch fresh comments from an Instagram post using RapidAPI.
+    """
+    post_id = post_url.split("/")[-2]
+    endpoint = f"/v1/comments?code_or_id_or_url={post_id}"
+
+    try:
+        conn = http.client.HTTPSConnection(API_HOST)
+        conn.request("GET", endpoint, headers=headers)
+        response = conn.getresponse()
+        status = response.status
+        raw_data = response.read()
+
+        if status == 200:
+            json_data = json.loads(raw_data.decode("utf-8", errors="replace"))
+            items = json_data.get("data", {}).get("items", [])
+
+            all_comments = [item.get("text", "No text available") for item in items]
+            spam_comments = [comment for comment in all_comments if detect_spam(comment)]
+
+            return all_comments, spam_comments
+        else:
+            print(f"Error fetching comments: Status Code {status}")
+            return [], []  # Return empty lists for any error code
+    finally:
+        conn.close()
+
+def refresh_browser(driver):
+    """
+    Refresh the Selenium browser to fetch the latest comments.
+    """
+    driver.refresh()
+    time.sleep(5)  # Allow time for the page to reload
+
+def open_browser_and_get_url():
+    """
+    Continuously fetch new Instagram comments and detect spam.
+    """
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+
+    service = Service("C:/Program Files/Google/Chrome/Application/chrome.exe")
+    driver = webdriver.Chrome()
+
+    try:
+        driver.get("https://www.instagram.com/")
+        time.sleep(5)
+
+        last_comments = set()  # Track previously seen comments
+
+        while True:
+            reel_url = driver.current_url
+            print(f"Current Reel URL: {reel_url}")
+
+            all_comments, spam_comments = fetch_instagram_comments(reel_url)
+
+            # Detect new comments
+            new_comments = set(all_comments) - last_comments
+            last_comments.update(new_comments)
+
+            if new_comments:
+                print("\n--- New Comments ---")
+                for comment in new_comments:
+                    print(comment)
+
+            if spam_comments:
+                inject_spam_comments(driver, spam_comments)
+                send_email_notification(spam_comments)
+                print("\n--- Detected Spam Comments ---")
+                for spam in spam_comments:
+                    print(spam)
+
+            refresh_browser(driver)  # Refresh to fetch latest comments
+            time.sleep(10)
+    finally:
+        driver.quit()
+
+def main():
+    open_browser_and_get_url()
+
+if __name__ == "__main__":
+    main()

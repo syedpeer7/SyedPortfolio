@@ -1,0 +1,16 @@
+/* Animated dotted vertical timeline line */
+.dotted-timeline-bg {
+  border-right: 4px dotted #6366f1; /* indigo-500 */
+  height: 0;
+  opacity: 0;
+  transition: height 1.2s cubic-bezier(0.4,0,0.2,1), opacity 0.6s;
+}
+.dotted-timeline-animate {
+  height: 90%; /* or 100% depending on spacing */
+  opacity: 1;
+}
+@media (prefers-color-scheme: dark) {
+  .dotted-timeline-bg {
+    border-right-color: #818cf8; /* indigo-400 */
+  }
+} 
