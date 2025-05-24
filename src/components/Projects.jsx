@@ -9,21 +9,21 @@ const projects = [
     description: "Precision: 85% | Storage Optimization: 40%",
     tech: ["Python", "CNN", "OpenCV"],
     url: "https://github.com/syedpeer7/CNN_image_compression",
-    image: "public/project1.png"
+    image: "/project1.png"
   },
   {
     title: "Live Google Form Response Dashboard",
     description: "Responsive UI | Real-time Visualization",
     tech: ["HTML", "CSS", "JavaScript", "TypeScript", "Tailwind CSS"],
     url: "https://google-form-response-visualizer.lovable.app/",
-    image: "public/project2.png"
+    image: "/project2.png"
   },
   {
     title: "Real-Time Student Distraction Detection System",
     description: "Real-time Analytics | Updates every 3s",
     tech: ["YOLOv8", "MediaPipe", "OpenCV", "Python", "Flask", "SQL"],
     url: "https://google-form-response-visualizer.lovable.app/",
-    image: "public/project3.jpg"
+    image: "/project3.jpg"
   },
   {
     title: "Digital Art Gallery",
